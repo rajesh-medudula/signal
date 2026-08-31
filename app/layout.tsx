@@ -13,7 +13,11 @@ export const metadata: Metadata = {
     "Signal analyzes your customer conversations and helps you focus on the opportunities that deserve your attention.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" className="h-full">
       <body className="min-h-full bg-paper text-ink antialiased">

@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Signal
 
-## Getting Started
+Signal is an AI customer-conversation intelligence platform. This
+repository currently contains **Module 1: project foundation** — the
+architecture, design system, and route shell that future modules (AI
+intelligence, channel integrations, CRM, lead scoring, follow-ups,
+billing) will build on. None of that functionality is implemented yet.
 
-First, run the development server:
+## Stack
+
+Next.js (App Router) · TypeScript · Tailwind CSS v4 · Supabase (planned
+backend/auth) · Vitest
+
+## Getting started
 
 ```bash
+npm install
+cp .env.example .env.local   # fill in real values later; not required to run the UI
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 for the landing page, or
+http://localhost:3000/dashboard for the dashboard shell.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Commands
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Start the development server |
+| `npm run build` | Production build |
+| `npm start` | Run the production build |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | TypeScript, no emit |
+| `npm test` | Vitest unit tests |
 
-## Learn More
+## Project structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+app/                  Routes (App Router)
+  page.tsx            Landing page
+  dashboard/          Dashboard shell + one placeholder page per nav item
+components/
+  brand/              Logo, hero signal graphic
+  marketing/          Landing page sections
+  dashboard/          Sidebar, top bar, empty states
+  ui/                 Shared primitives (Button)
+lib/
+  ai/                 AI provider adapter interface (not implemented)
+  channels/           Channel connector interface + gmail/whatsapp/instagram/telegram placeholders
+  db/supabase/        Browser + server Supabase clients
+  auth/               Session placeholder
+  crm/, scoring/      Draft types for future modules (not a final schema)
+  security/           Env-var validation helpers
+types/                Cross-cutting foundation types
+supabase/migrations/  Empty — schema is designed in the next module
+tests/                Vitest unit tests
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Environment variables
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+See `.env.example` for the full list with placeholder values. Real
+secrets belong in `.env.local`, which is git-ignored.
 
-## Deploy on Vercel
+## Architecture notes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Channel independence** — channel-specific code lives only inside
+  `lib/channels/<channel>`. Everything else depends on the
+  `NormalizedMessage` / `ChannelConnector` contracts in
+  `lib/channels/types.ts`.
+- **AI provider independence** — application code should call
+  `lib/ai/provider.ts` rather than importing a vendor SDK directly.
+- **Multi-tenant** — shared types assume every business-scoped record
+  carries a `businessId`; there is deliberately no schema assuming a
+  single global customer list.
