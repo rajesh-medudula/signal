@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/*
+  Signal design tokens.
+
+  Concept: a business's inbox is noisy — Signal's job is to pull the one
+  message that matters out of the crowd. The palette and the hero graphic
+  both play on that idea (scattered "noise" resolving into one clean line),
+  so the amber "signal" color is used sparingly, only where something
+  genuinely deserves attention.
+*/
+:root {
+  --color-paper: #f7f5f0;
+  --color-paper-dim: #efebe2;
+  --color-ink: #14171f;
+  --color-ink-soft: #383c46;
+  --color-slate: #5b5f6b;
+  --color-rule: #ddd8cb;
+  --color-noise: #b7b2a4;
+  --color-signal: #e2a63b;
+  --color-signal-deep: #b9812a;
+  --color-signal-tint: #f6e8cc;
+
+  --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@theme inline {
+  --color-paper: var(--color-paper);
+  --color-paper-dim: var(--color-paper-dim);
+  --color-ink: var(--color-ink);
+  --color-ink-soft: var(--color-ink-soft);
+  --color-slate: var(--color-slate);
+  --color-rule: var(--color-rule);
+  --color-noise: var(--color-noise);
+  --color-signal: var(--color-signal);
+  --color-signal-deep: var(--color-signal-deep);
+  --color-signal-tint: var(--color-signal-tint);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+}
+
+* {
+  border-color: var(--color-rule);
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-feature-settings: "tnum" 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-signal-deep);
+  outline-offset: 2px;
+}
