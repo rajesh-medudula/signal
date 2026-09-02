@@ -26,12 +26,12 @@ export function Nav() {
 
         <div className="flex items-center gap-4">
           <Link
-            href="/dashboard"
+            href="/sign-in"
             className="hidden text-[13px] text-text-secondary hover:text-text sm:inline"
           >
             Sign in
           </Link>
-          <ButtonLink href="/dashboard" size="sm">
+          <ButtonLink href="/sign-up" size="sm">
             Start free
           </ButtonLink>
         </div>

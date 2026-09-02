@@ -12,7 +12,7 @@ export function Hero() {
         most likely to buy, and tells you what to do next.
       </p>
       <div className="mt-8 flex items-center justify-center gap-3">
-        <ButtonLink href="/dashboard">Start free</ButtonLink>
+        <ButtonLink href="/sign-up">Start free</ButtonLink>
         <ButtonLink href="#how-it-works" variant="secondary">
           See how it works
         </ButtonLink>

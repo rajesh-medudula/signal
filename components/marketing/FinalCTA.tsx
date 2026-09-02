@@ -12,7 +12,7 @@ export function FinalCTA() {
           deserve your attention.
         </p>
         <div className="mt-7">
-          <ButtonLink href="/dashboard">Start free</ButtonLink>
+          <ButtonLink href="/sign-up">Start free</ButtonLink>
         </div>
       </div>
     </section>
