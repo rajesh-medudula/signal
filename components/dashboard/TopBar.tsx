@@ -1,11 +1,14 @@
+import { MobileNav } from "@/components/dashboard/MobileNav";
+import { AccountMenu } from "@/components/dashboard/AccountMenu";
+
 export function TopBar() {
   return (
-    <header className="flex items-center justify-between border-b border-rule px-8 py-4">
-      <span className="text-sm text-slate">Your business</span>
-      <div
-        className="h-8 w-8 rounded-full bg-paper-dim"
-        aria-label="Account menu placeholder"
-      />
+    <header className="flex h-14 items-center justify-between border-b border-border bg-surface px-4 md:px-6">
+      <div className="flex items-center gap-3">
+        <MobileNav />
+        <span className="text-sm text-text-secondary">Your business</span>
+      </div>
+      <AccountMenu />
     </header>
   );
 }

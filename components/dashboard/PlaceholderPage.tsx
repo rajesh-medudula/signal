@@ -1,16 +1,42 @@
-import { EmptyState } from "@/components/dashboard/EmptyState";
+import type { LucideIcon } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ConnectChannelModal } from "@/components/dashboard/ConnectChannelModal";
+import { Button } from "@/components/ui/Button";
 
 type PlaceholderPageProps = {
-  title: string;
-  body: string;
+  pageTitle: string;
+  icon: LucideIcon;
+  emptyTitle: string;
+  emptyBody: string;
+  /** Most sections are gated on connecting a channel; a few aren't. */
+  showConnectAction?: boolean;
 };
 
-export function PlaceholderPage({ title, body }: PlaceholderPageProps) {
+export function PlaceholderPage({
+  pageTitle,
+  icon,
+  emptyTitle,
+  emptyBody,
+  showConnectAction = true,
+}: PlaceholderPageProps) {
   return (
     <div>
-      <h1 className="font-display text-3xl text-ink">{title}</h1>
-      <div className="mt-8">
-        <EmptyState title="Coming in a future module" body={body} />
+      <h1 className="text-xl font-semibold tracking-tight text-text">
+        {pageTitle}
+      </h1>
+      <div className="mt-6">
+        <EmptyState
+          icon={icon}
+          title={emptyTitle}
+          body={emptyBody}
+          action={
+            showConnectAction ? (
+              <ConnectChannelModal
+                trigger={<Button size="sm">Connect a channel</Button>}
+              />
+            ) : undefined
+          }
+        />
       </div>
     </div>
   );

@@ -1,15 +1,15 @@
 # Signal
 
 Signal is an AI customer-conversation intelligence platform. This
-repository currently contains **Module 1: project foundation** — the
-architecture, design system, and route shell that future modules (AI
-intelligence, channel integrations, CRM, lead scoring, follow-ups,
-billing) will build on. None of that functionality is implemented yet.
+repository currently contains **Module 1: project foundation** and
+**Module 1.5: design system**. The visual language is final; product
+functionality (auth, database, AI, channel integrations, CRM, lead
+scoring, follow-ups, billing) is still not implemented.
 
 ## Stack
 
-Next.js (App Router) · TypeScript · Tailwind CSS v4 · Supabase (planned
-backend/auth) · Vitest
+Next.js (App Router) · TypeScript · Tailwind CSS v4 · Geist Sans/Mono ·
+Radix UI primitives · Supabase (planned backend/auth) · Vitest
 
 ## Getting started
 
@@ -37,13 +37,13 @@ http://localhost:3000/dashboard for the dashboard shell.
 
 ```
 app/                  Routes (App Router)
-  page.tsx            Landing page
-  dashboard/          Dashboard shell + one placeholder page per nav item
+  page.tsx            Landing page (nav, hero, product preview, roadmap sections)
+  dashboard/           Dashboard shell + one page per nav item
 components/
-  brand/              Logo, hero signal graphic
-  marketing/          Landing page sections
-  dashboard/          Sidebar, top bar, empty states
-  ui/                 Shared primitives (Button)
+  brand/              Logo (wordmark)
+  marketing/          Landing page sections + product preview mockup
+  dashboard/          Sidebar, mobile nav, top bar, account menu, empty states
+  ui/                 Design-system primitives (Button, Card, Select, Modal, ...)
 lib/
   ai/                 AI provider adapter interface (not implemented)
   channels/           Channel connector interface + gmail/whatsapp/instagram/telegram placeholders
@@ -51,6 +51,7 @@ lib/
   auth/               Session placeholder
   crm/, scoring/      Draft types for future modules (not a final schema)
   security/           Env-var validation helpers
+  ui/                 cn() class-name utility, greeting helper
 types/                Cross-cutting foundation types
 supabase/migrations/  Empty — schema is designed in the next module
 tests/                Vitest unit tests

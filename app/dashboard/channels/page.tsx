@@ -1,10 +1,13 @@
+import { Plug } from "lucide-react";
 import { PlaceholderPage } from "@/components/dashboard/PlaceholderPage";
 
 export default function ChannelsPage() {
   return (
     <PlaceholderPage
-      title="Channels"
-      body="Connect Gmail, WhatsApp Business, Instagram, Telegram, Facebook Messenger, or your website chat here once each channel connector is built."
+      pageTitle="Channels"
+      icon={Plug}
+      emptyTitle="No channels connected"
+      emptyBody="Connect Gmail, WhatsApp Business, Instagram, Telegram, Facebook Messenger, or your website chat to start bringing conversations into Signal."
     />
   );
 }

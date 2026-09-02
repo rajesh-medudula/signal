@@ -1,10 +1,13 @@
+import { BarChart3 } from "lucide-react";
 import { PlaceholderPage } from "@/components/dashboard/PlaceholderPage";
 
 export default function AnalyticsPage() {
   return (
     <PlaceholderPage
-      title="Analytics"
-      body="Trends across your conversations — volume, response time, intent, and outcomes — will appear here once analytics are built."
+      pageTitle="Analytics"
+      icon={BarChart3}
+      emptyTitle="No analytics yet"
+      emptyBody="Trends across your conversations — volume, response time, intent, and outcomes — will appear here once you're connected."
     />
   );
 }

@@ -2,28 +2,38 @@ import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
 import { ButtonLink } from "@/components/ui/Button";
 
+const links = [
+  { href: "#how-it-works", label: "How it works" },
+  { href: "#capabilities", label: "AI capabilities" },
+  { href: "#channels", label: "Channels" },
+];
+
 export function Nav() {
   return (
-    <header className="border-b border-rule">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
+    <header className="sticky top-0 z-40 border-b border-border bg-surface/95">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
         <Link href="/" aria-label="Signal home">
           <Logo />
         </Link>
 
-        <nav className="hidden items-center gap-8 text-sm text-ink-soft md:flex">
-          <a href="#how-it-works" className="hover:text-ink">
-            How it works
-          </a>
-          <a href="#channels" className="hover:text-ink">
-            Channels
-          </a>
+        <nav className="hidden items-center gap-7 text-[13px] text-text-secondary md:flex">
+          {links.map((link) => (
+            <a key={link.href} href={link.href} className="hover:text-text">
+              {link.label}
+            </a>
+          ))}
         </nav>
 
-        <div className="flex items-center gap-5 text-sm">
-          <Link href="/dashboard" className="hidden text-ink-soft hover:text-ink sm:inline">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/dashboard"
+            className="hidden text-[13px] text-text-secondary hover:text-text sm:inline"
+          >
             Sign in
           </Link>
-          <ButtonLink href="/dashboard">Get Started</ButtonLink>
+          <ButtonLink href="/dashboard" size="sm">
+            Start free
+          </ButtonLink>
         </div>
       </div>
     </header>
