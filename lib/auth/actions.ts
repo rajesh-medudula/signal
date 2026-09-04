@@ -60,8 +60,10 @@ export async function signUpAction(
 
   if (data.session) {
     // Email confirmation is disabled for this project — the account is
-    // usable immediately.
-    redirect("/dashboard");
+    // usable immediately. New accounts have no business yet, so send
+    // them to onboarding rather than a dashboard that would just
+    // redirect them there anyway.
+    redirect("/onboarding");
   }
 
   return { error: null, awaitingConfirmation: true };
