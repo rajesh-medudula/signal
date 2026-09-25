@@ -166,6 +166,132 @@ module and sits in the auth flow (Module 2A's area), not the tenancy
 boundary this module built — noted here so it isn't lost, not fixed
 here to keep this module's scope to business/membership/RLS.
 
+## Module 3A — Customer / Conversation / Message foundation
+
+### Five business-scoped tables, reusing Module 2B's tenant boundary as-is
+
+`channel_connections`, `customers`, `customer_identities`,
+`conversations`, `messages` (all `public`, migration
+`20260924120000_customer_conversation_message_foundation.sql`). Every
+table carries a direct, non-null `business_id`, forced RLS using the
+same `private.is_member_of` / `private.is_business_admin` helpers from
+Module 2B, and composite tenant-consistent foreign keys (`(id,
+business_id)` on the parent side) rather than a second tenant
+mechanism. `conversations` is strictly 1:1 with `customers` — one
+thread per (customer, channel connection) — enforced by `UNIQUE
+(channel_connection_id, external_conversation_id)`; this is also the
+database backstop behind the "never misattribute a secondary thread
+participant to the primary customer" rule — an inbound event with
+unsupported multi-participant shape must be quarantined by the
+ingestion layer (not built yet) rather than force-fit into this model.
+
+### Two trust boundaries, enforced at both the RLS and SQL-privilege layers
+
+- **`authenticated`** (ordinary signed-in member, via
+  `lib/db/supabase/server.ts`): can read everything in their business,
+  and can edit a narrow, explicitly column-granted set of metadata —
+  `customers` (`display_name`, `primary_email`, `primary_phone`,
+  `metadata`), `conversations` (`subject`, `status`),
+  `channel_connections` (`display_label`, `status`, admin-only). No
+  role has `DELETE` on any of the five tables.
+- **`service_role`** (trusted backend ingestion/integration
+  infrastructure, via `lib/db/supabase/admin.ts`): the *only* path
+  that can create `messages` or `customer_identities` at all.
+  `authenticated` has zero `INSERT`/`UPDATE` on `messages` and zero
+  `INSERT` on `customer_identities` — enforced by explicit `REVOKE`
+  statements in the migration, not RLS alone, so this holds even if an
+  RLS policy were ever added or misconfigured later. There is
+  deliberately no client-facing message-creation path in
+  `lib/conversations/queries.ts` (§19 of the module design) — sending
+  a message is future outbox-module work
+  (`User Send Intent → Outbox Queue → Provider API → Provider
+  Confirmation → service_role → canonical messages row`), not this
+  module.
+
+### `messages` is canonical, provider-confirmed history only
+
+`external_message_id` is `text not null`, backed by `UNIQUE
+(channel_connection_id, external_message_id)` — there is no
+"pending/unconfirmed outbound" row shape mixed into this table.
+`sequence` is a `bigint generated always as identity`, the allocation-
+order tiebreaker; `(provider_sent_at, sequence)` is the total display/
+pagination order. Both are represented as `string` at the TypeScript
+boundary (`Message.sequence`, `Conversation.lastMessageSequence`) to
+avoid `bigint` → `number` precision loss over JSON — see the row
+mappers in `lib/conversations/queries.ts`.
+
+A `CHECK` constraint is the direction/sender matrix: `inbound` implies
+`sender_type = 'customer'`; `outbound` implies `business_member` or
+`system`. Composite FKs additionally enforce that a `customer` sender
+actually matches the message's own conversation
+(`(conversation_id, business_id, sender_customer_id)` →
+`conversations(id, business_id, customer_id)`) and that a
+`business_member` sender actually holds a membership in the message's
+business (`(sender_member_user_id, business_id)` →
+`memberships(user_id, business_id)`) — a sender can't be spoofed into
+the wrong conversation or the wrong business even by trusted-looking
+service-role code with a bug.
+
+### `conversations.last_message_*` is trigger-owned, with an explicit concurrency fix
+
+`private.update_conversation_last_message()` keeps
+`last_message_at`/`last_message_sequence`/`last_message_preview`
+tracking the message with the maximum `(provider_sent_at, sequence)`
+tuple. A cheap conditional `UPDATE` (fast path) handles the common
+case. The slow path only runs when an `UPDATE` on `messages` moves
+*the row that was currently cached as leader* backward in time; under
+`READ COMMITTED`, recomputing "what's actually latest" without care
+here can race a concurrent `INSERT` of a genuinely newer message and
+overwrite it with stale data. The fix: the slow path takes an explicit
+`SELECT ... FOR UPDATE` on the `conversations` row before recomputing,
+re-checks (under that lock) whether the edited row is still the cached
+leader, and — only if so — recomputes from a fresh scan of `messages`
+and writes it back under the same non-regression predicate the fast
+path uses. `tests/rls/verify-rls-conversations.mjs` exercises this
+with two genuinely concurrent connections and — as a sanity check
+during implementation — was confirmed to fail against a
+deliberately-unlocked version of the trigger, so the row lock is doing
+real work, not just documenting an assumption.
+
+### Identity resolution is an ingestion-worker algorithm, not a stored procedure
+
+`customer_identities` maps a normalized external identity value (e.g.
+a lowercased email, an E.164 phone number) to a `customer_id` on a
+given `channel_connection_id`, `UNIQUE (channel_connection_id,
+external_identity_value)`. The race-safe resolution algorithm
+(normalize → `pg_advisory_xact_lock(hashtextextended(channel_connection_id
+|| ':' || normalized_value, 0))` → re-query → reuse-or-create
+`Customer` + `CustomerIdentity`) is documented for future ingestion
+workers to follow — there is no ingestion worker in this repository
+yet (explicitly out of scope; see below), so nothing calls it. The
+primitive itself (advisory lock + uniqueness constraint) is verified
+directly in `tests/rls/verify-rls-conversations.mjs` by running two
+concurrent `service_role` sessions through the algorithm by hand.
+
+### Bidirectional keyset pagination over `(provider_sent_at, sequence)`
+
+`listMessages` in `lib/conversations/queries.ts` supports
+`direction: 'before'` (historical, descending, strictly older than the
+cursor) and `direction: 'after'` (forward-tailing, ascending, strictly
+newer). The strict tuple comparison is expressed through PostgREST's
+`or()` as `a < x OR (a = x AND b < y)` (or `>`/`>` for `after`), backed
+by `messages_conversation_display_idx (conversation_id,
+provider_sent_at, sequence)`. `listConversations` uses a simpler
+single-column keyset over `last_message_at`
+(`conversations_business_last_message_idx`), since the design left its
+exact pagination shape open — this is an implementation choice within
+the module, not part of the authoritative design's `§19` interface.
+
+### What's deliberately not here
+
+Outbox/pending-send queues, provider send APIs, ingestion workers,
+webhooks, Gmail OAuth, AI processing, opportunity scoring, CRM stages,
+attachment storage, and multi-participant thread engines are all
+future-module work. No UI was built for these tables in this module —
+Module 3A is schema, TypeScript contracts
+(`lib/conversations/types.ts`), and the read/limited-update query
+layer only.
+
 ## Module boundaries
 
 Later modules build on the contracts above rather than bypassing them:
@@ -176,10 +302,16 @@ Later modules build on the contracts above rather than bypassing them:
   `lib/db/supabase/server.ts`. Reaching for `admin.ts` to "make RLS go
   away" for ordinary user-facing code is a reversal of this decision,
   not an extension of it.
-- Customer/conversation/channel data (Module 3+) is business-scoped
-  data that lives *inside* the tenant boundary Module 2B built —
-  new tables should get RLS policies following the same
-  `private.is_member_of` pattern, not a new authorization scheme.
+- Customer/conversation/channel data (Module 3A) is business-scoped
+  data that lives *inside* the tenant boundary Module 2B built, using
+  the same `private.is_member_of` / `private.is_business_admin`
+  pattern — no new authorization scheme. Later modules (ingestion,
+  outbox, AI, CRM, scoring) build on Module 3A's five tables and
+  trust boundary rather than adding parallel ones; in particular,
+  nothing outside trusted `service_role` ingestion code should ever
+  gain a client-facing path to `INSERT`/`UPDATE` `messages` or
+  `INSERT` `customer_identities` — that boundary is intentional, not
+  a gap to "fix" later.
 - Member management (invitations, role changes, removal) was left
   unimplemented on purpose — `memberships` has no client-facing
   `INSERT`/`UPDATE`/`DELETE` policy at all yet. Building that means

@@ -43,3 +43,11 @@ grant select on auth.users to anon, authenticated, service_role;
 grant usage on schema public to anon, authenticated, service_role;
 grant usage on schema private to anon, authenticated, service_role;
 alter default privileges in schema public grant select, insert, update, delete on tables to authenticated;
+-- Real Supabase projects grant service_role unrestricted table
+-- privileges in the public schema as part of their own baseline setup
+-- (separate from anything a project's migrations do) — it's how
+-- `bypassrls` trusted backend infrastructure is able to write at all,
+-- since BYPASSRLS only skips row-security policy checks, not table-
+-- level SQL privileges. Mirrored here so this shim matches production
+-- role behavior for any table Module 3A+ migrations add.
+alter default privileges in schema public grant select, insert, update, delete on tables to service_role;

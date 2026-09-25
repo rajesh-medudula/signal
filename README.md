@@ -3,12 +3,17 @@
 Signal is an AI customer-conversation intelligence platform. This
 repository currently contains **Module 1: project foundation**,
 **Module 1.5: design system**, **Module 2A: authentication + secure
-Supabase foundation**, and **Module 2B: business/workspace tenancy,
-roles, and RLS**. Sign-up, sign-in, sign-out, business onboarding, and
-a protected, tenant-scoped dashboard are implemented; the rest of the
-product (database schema for customer/conversation data, AI, channel
-integrations, CRM, lead scoring, follow-ups, billing) is still not
-implemented.
+Supabase foundation**, **Module 2B: business/workspace tenancy, roles,
+and RLS**, and **Module 3A: customer/conversation/message foundation**.
+Sign-up, sign-in, sign-out, business onboarding, a protected,
+tenant-scoped dashboard, and the canonical `channel_connections` /
+`customers` / `customer_identities` / `conversations` / `messages`
+schema (with its read/limited-update query layer) are implemented;
+channel ingestion, AI processing, CRM, lead scoring, follow-ups, and
+billing are still not implemented. Canonical message and verified
+customer-identity creation is trusted-backend (`service_role`)
+territory only — there is no client-facing way to send or fabricate a
+message yet, by design (see `docs/architecture.md`).
 
 ## Stack
 
@@ -56,16 +61,17 @@ components/
 lib/
   ai/                 AI provider adapter interface (not implemented)
   channels/           Channel connector interface + gmail/whatsapp/instagram/telegram placeholders
+  conversations/      Customer/conversation/message domain types + read/limited-update query layer (Module 3A)
   db/supabase/        Browser, authenticated-server, service-role Supabase clients + session-refresh helper
   auth/               Session abstraction, route guard, sign-up/in/out server actions
   business/           Business/membership types, queries, active-business context, authorization helpers, onboarding actions
   crm/, scoring/      Draft types for future modules (not a final schema)
   security/           Env-var validation helpers
   ui/                 cn() class-name utility, greeting helper
-supabase/migrations/  businesses/memberships schema, roles, RLS policies, onboarding function
+supabase/migrations/  businesses/memberships schema (2B); customer/conversation/message schema (3A) — roles, RLS policies, triggers
 docs/architecture.md  Durable architecture decisions, by module
 tests/                Vitest unit tests
-tests/rls/            Real Postgres RLS verification harness (not part of `npm test` — see its usage note below)
+tests/rls/            Real Postgres RLS verification harnesses (not part of `npm test` — see the usage note below)
 ```
 
 ## Environment variables
@@ -75,15 +81,22 @@ secrets belong in `.env.local`, which is git-ignored.
 
 ## Verifying RLS against real Postgres
 
-`tests/rls/verify-rls.mjs` exercises the actual policies in
-`supabase/migrations/` against a real Postgres instance — cross-tenant
-read/write denial, member-vs-admin authorization, self-promotion
-denial, and idempotent onboarding — using genuine per-user sessions
-(not mocks). It needs a local Postgres with `tests/rls/auth-shim.sql`
-applied first (a minimal stand-in for Supabase's `auth.users`/
-`auth.uid()`/roles) and isn't wired into `npm test` since most
-environments won't have a local Postgres available. See the comments
-at the top of both files for exact setup.
+`tests/rls/verify-rls.mjs` exercises the Module 2B policies —
+cross-tenant read/write denial, member-vs-admin authorization,
+self-promotion denial, and idempotent onboarding. `tests/rls/verify-rls-conversations.mjs`
+does the same for Module 3A, plus what a mocked client can't cover:
+`service_role`-only message/identity provenance, the sender/direction
+`CHECK` and composite-FK invariants, the `last_message_*` trigger's
+concurrency fix (two genuinely concurrent connections), the
+advisory-locked identity-resolution race, and bidirectional keyset
+pagination. Both use genuine per-user (and, for 3A, per-role) Postgres
+sessions — not mocks. They need a local Postgres with
+`tests/rls/auth-shim.sql` applied first (a minimal stand-in for
+Supabase's `auth.users`/`auth.uid()`/roles, plus the `service_role`
+table grants real Supabase projects provide outside of any migration),
+then each module's migration in order, and aren't wired into `npm
+test` since most environments won't have a local Postgres available.
+See the comments at the top of each file for exact setup.
 
 ## Architecture notes
 
