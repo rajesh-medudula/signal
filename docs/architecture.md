@@ -292,6 +292,126 @@ Module 3A is schema, TypeScript contracts
 (`lib/conversations/types.ts`), and the read/limited-update query
 layer only.
 
+## Module 4 — Gmail OAuth connection lifecycle
+
+Scope: connect / reconnect / disconnect a Gmail mailbox for a
+business, and store the credential needed to use it later. No message
+ingestion, no `messages.list`/`messages.get`, no `users.watch`/push,
+no AI, no CRM, no outbox/send infrastructure — those are explicitly
+later modules. The existing `lib/channels/gmail/connector.ts`
+placeholder (`connect`/`fetchNewMessages`/`sendMessage` all throwing
+`NotImplementedError`) is untouched; this module doesn't implement the
+`ChannelConnector` contract, only what has to exist before anything
+could.
+
+### A channel_connections row is not proof of a connection
+
+Module 3A's own RLS already lets a business admin `INSERT`/`UPDATE`
+`channel_connections` directly through the Data API — that's
+unavoidable and unchanged (`private.is_business_admin(business_id)`),
+so an admin could set `channel = 'gmail'`, `status = 'connected'` by
+hand with nothing real behind it. Module 4 does not try to prevent
+that write (it would mean touching Module 3A's policies, out of
+scope); instead it makes sure nothing downstream trusts a
+`channel_connections` row alone:
+
+- The actual, usable state is `gmail_connection_credentials` — a
+  connection is only really working if a decryptable credential row
+  exists for it.
+- `lib/channels/gmail/queries.ts` (`listGmailConnections`, the
+  Channels page's read path) treats a `connected`-looking row with no
+  matching credential as `status: "error"` for display, rather than
+  showing a false "Connected".
+- `public.persist_gmail_connection` (below) is the only *trusted
+  Module 4* path for establishing a verified connection — the only
+  thing that can make a `connected`-status row and its real,
+  decryptable credential exist together. It is not, and does not
+  attempt to be, the only way `channel_connections` itself can be
+  written: Module 3A's admin `INSERT`/`UPDATE` policies on that table
+  are unchanged, so an admin can still set `status = 'connected'`
+  directly with nothing real behind it — which is exactly the case the
+  bullet above (and `queries.ts`) is guarding against.
+
+### gmail_connection_credentials: RLS-denied, service-role-only
+
+`public.gmail_connection_credentials` (one row per `channel_connections`
+row, `channel = 'gmail'`) has RLS enabled **and forced**, with **zero**
+policies for `authenticated`/`anon` — same default-deny pattern Module
+3A already uses for `messages`/`customer_identities` — plus an explicit
+`revoke all ... from authenticated, anon` as a statement-level backstop.
+Only `service_role` can read or write it, from
+`lib/channels/gmail/credentials.ts`, which itself only runs after
+`requireBusinessAdmin()` has already authorized the caller at the
+application layer. The stored refresh token is application-level
+AES-256-GCM ciphertext (`lib/channels/gmail/crypto.ts`) bound via AEAD
+associated data to `(business_id, external_account_id)` — the RLS
+denial and the encryption are two independent layers, neither a
+substitute for the other. Access tokens are never persisted at all;
+they're used once, in memory, immediately after token exchange, and
+discarded.
+
+### persist_gmail_connection: the only trusted Module 4 write path
+
+`public.persist_gmail_connection(...)` (`SECURITY DEFINER`, executable
+only by `service_role`) atomically upserts `channel_connections` and
+`gmail_connection_credentials` together, keyed by
+`channel_connections`' existing `unique(business_id, channel,
+external_account_id)` constraint — so a call through this function
+never leaves a `connected` row without a credential, or vice versa.
+This doesn't narrow Module 3A's own policies: an admin can still
+`INSERT`/`UPDATE` `channel_connections` directly, `status = 'connected'`
+included: that write path is Module 3A's, untouched, and Module 4 only
+adds a *second*, narrower guarantee on top of it (a row this function
+touches has a real credential behind it) rather than replacing it.
+Reconnect
+semantics live here: a user-customized `display_label` is never
+overwritten by a reconnect; a `NULL` refresh token on reconnect retains
+the previously stored one; a `NULL` refresh token with **no** existing
+credential fails the whole call closed via the `refresh_token_ciphertext`
+column's `NOT NULL` constraint (the same case
+`lib/channels/gmail/connection.ts` already checks explicitly beforehand,
+for a precise `missing_refresh_token` error rather than a generic one).
+
+Implementation note: Postgres validates a candidate row's `NOT NULL`
+constraints *before* `ON CONFLICT` resolution even runs, so the
+credential upsert can't be a single `INSERT ... ON CONFLICT DO UPDATE`
+— it explicitly branches on whether a credential row already exists
+(locking it first with `SELECT ... FOR UPDATE` to serialize concurrent
+calls for the same connection), doing a plain `UPDATE` on the existing-row
+path and a plain `INSERT` (which correctly fails closed on a `NULL`
+ciphertext) on the new-row path.
+
+### OAuth state: PKCE + an encrypted, single-use cookie
+
+`lib/channels/gmail/oauth.ts` generates the `state`/PKCE pair and seals
+them (with the caller's user/business IDs, issue/expiry time, and a
+sanitized return path) into an AES-256-GCM-encrypted, `HttpOnly`,
+10-minute cookie. The encryption key is HKDF-derived from
+`GOOGLE_CLIENT_SECRET` with a fixed, purpose-specific `info` string —
+deliberately not a new required environment variable, since the module
+specification's env-var list didn't add one for this. The callback
+route (`app/api/channels/gmail/callback/route.ts`) decodes and
+compares `state`, checks expiry, then calls `requireBusinessAdmin()`
+**again** (re-verifying the Signal session and the business-admin role
+from scratch, since either can change while the user is away at
+Google) before ever exchanging the authorization code.
+
+### Return path validation
+
+`sanitizeReturnPath` only ever accepts a same-origin relative path
+(rejecting an absolute URL, a protocol-relative `//host` URL, a
+`javascript:` URL, or anything with a backslash/control character),
+falling back to `/dashboard/channels`. This runs once, at
+authorize-time, before the value is sealed into the state cookie.
+
+### Disconnect: local-first, remote revocation is best-effort
+
+`disconnectGmailConnection` (`lib/channels/gmail/connection.ts`)
+always deletes the local encrypted credential and marks the connection
+`disconnected`, even when the best-effort Google token-revocation call
+fails — a failed remote revocation must never leave a usable local
+credential behind.
+
 ## Module boundaries
 
 Later modules build on the contracts above rather than bypassing them:
@@ -318,3 +438,11 @@ Later modules build on the contracts above rather than bypassing them:
   adding narrowly-scoped policies (e.g. "an admin can insert a
   membership for a specific invited user"), not opening the table up
   broadly.
+- Gmail message/thread ingestion (a later module) is the only intended
+  reader of `lib/channels/gmail/credentials.ts`'s `getGmailRefreshToken`
+  besides the disconnect flow — it should call that function rather
+  than querying `gmail_connection_credentials` directly, and should
+  check `hasGrantedScope()` against the credential's actually-recorded
+  scopes before relying on anything beyond `gmail.metadata` (e.g.
+  `gmail.readonly`), since Module 4 only ever requests the metadata
+  scope.

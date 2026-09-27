@@ -4,16 +4,20 @@ Signal is an AI customer-conversation intelligence platform. This
 repository currently contains **Module 1: project foundation**,
 **Module 1.5: design system**, **Module 2A: authentication + secure
 Supabase foundation**, **Module 2B: business/workspace tenancy, roles,
-and RLS**, and **Module 3A: customer/conversation/message foundation**.
-Sign-up, sign-in, sign-out, business onboarding, a protected,
-tenant-scoped dashboard, and the canonical `channel_connections` /
-`customers` / `customer_identities` / `conversations` / `messages`
-schema (with its read/limited-update query layer) are implemented;
-channel ingestion, AI processing, CRM, lead scoring, follow-ups, and
-billing are still not implemented. Canonical message and verified
-customer-identity creation is trusted-backend (`service_role`)
-territory only — there is no client-facing way to send or fabricate a
-message yet, by design (see `docs/architecture.md`).
+and RLS**, **Module 3A: customer/conversation/message foundation**, and
+**Module 4: Gmail OAuth connection lifecycle**. Sign-up, sign-in,
+sign-out, business onboarding, a protected, tenant-scoped dashboard,
+the canonical `channel_connections` / `customers` /
+`customer_identities` / `conversations` / `messages` schema (with its
+read/limited-update query layer), and connecting/reconnecting/
+disconnecting a Gmail mailbox from the Channels page are implemented;
+actually ingesting Gmail messages, AI processing, other channel
+integrations, CRM, lead scoring, follow-ups, and billing are still not
+implemented. Canonical message and verified customer-identity creation,
+and the encrypted Gmail credential, are trusted-backend (`service_role`)
+territory only — there is no client-facing way to send/fabricate a
+message or read/forge a Gmail credential, by design (see
+`docs/architecture.md`).
 
 ## Stack
 
@@ -50,6 +54,7 @@ app/                  Routes (App Router)
   sign-in/, sign-up/  Auth routes
   onboarding/         First-business creation (redirect target for users with no business yet)
   dashboard/          Dashboard shell + one page per nav item (protected, tenant-scoped)
+  api/channels/gmail/ Gmail OAuth routes: authorize, callback, disconnect (Module 4)
 proxy.ts               Refreshes the Supabase session cookie on each request
 components/
   brand/              Logo (wordmark)
@@ -57,10 +62,14 @@ components/
   dashboard/          Sidebar, mobile nav, top bar, account menu, empty states
   auth/               Sign-in/sign-up forms + shared auth page shell
   business/           Onboarding form
+  channels/           GmailConnectionCard (Module 4)
   ui/                 Design-system primitives (Button, Card, Select, Modal, ...)
 lib/
   ai/                 AI provider adapter interface (not implemented)
-  channels/           Channel connector interface + gmail/whatsapp/instagram/telegram placeholders
+  channels/           Channel connector interface + gmail/whatsapp/instagram/telegram placeholders;
+                      lib/channels/gmail/{oauth,profile,crypto,credentials,connection,queries,errors}.ts
+                      is the Module 4 OAuth connection lifecycle — connector.ts itself is still
+                      the unimplemented placeholder for actual message ingestion
   conversations/      Customer/conversation/message domain types + read/limited-update query layer (Module 3A)
   db/supabase/        Browser, authenticated-server, service-role Supabase clients + session-refresh helper
   auth/               Session abstraction, route guard, sign-up/in/out server actions
@@ -68,7 +77,8 @@ lib/
   crm/, scoring/      Draft types for future modules (not a final schema)
   security/           Env-var validation helpers
   ui/                 cn() class-name utility, greeting helper
-supabase/migrations/  businesses/memberships schema (2B); customer/conversation/message schema (3A) — roles, RLS policies, triggers
+supabase/migrations/  businesses/memberships schema (2B); customer/conversation/message schema (3A);
+                      gmail_connection_credentials + persist_gmail_connection (4) — roles, RLS policies, triggers
 docs/architecture.md  Durable architecture decisions, by module
 tests/                Vitest unit tests
 tests/rls/            Real Postgres RLS verification harnesses (not part of `npm test` — see the usage note below)
@@ -77,7 +87,10 @@ tests/rls/            Real Postgres RLS verification harnesses (not part of `npm
 ## Environment variables
 
 See `.env.example` for the full list with placeholder values. Real
-secrets belong in `.env.local`, which is git-ignored.
+secrets belong in `.env.local`, which is git-ignored. Module 4 (Gmail)
+adds `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`,
+and `GMAIL_TOKEN_ENCRYPTION_KEY_V1` — see the Module 4 completion
+report for the exact Google Cloud OAuth client setup steps.
 
 ## Verifying RLS against real Postgres
 
@@ -96,6 +109,11 @@ Supabase's `auth.users`/`auth.uid()`/roles, plus the `service_role`
 table grants real Supabase projects provide outside of any migration),
 then each module's migration in order, and aren't wired into `npm
 test` since most environments won't have a local Postgres available.
+`tests/rls/verify-rls-gmail.mjs` does the same for Module 4 on top of
+2B + 3A's migrations: the `persist_gmail_connection` atomic
+upsert/reconnect/fail-closed behavior, the composite-FK cross-tenant
+rejection, and that `authenticated` has zero access — not even its own
+business's — to `gmail_connection_credentials` or the function itself.
 See the comments at the top of each file for exact setup.
 
 ## Architecture notes
@@ -117,6 +135,11 @@ See the comments at the top of each file for exact setup.
   client (`lib/db/supabase/admin.ts`, RLS-bypassing) are deliberately
   different functions. See `docs/architecture.md` for when to use
   which.
+- **A row is never proof of a connection** — `channel_connections`
+  status alone is never trusted as evidence that a Gmail (or any
+  future channel's) integration actually works; the encrypted
+  credential is the only thing that proves it. See `docs/architecture.md`
+  (Module 4).
 - **RLS + application authorization, both** — database policies are
   the backstop; `lib/business/authorization.ts` is what routes
   actually call. See `docs/architecture.md` for the full model.

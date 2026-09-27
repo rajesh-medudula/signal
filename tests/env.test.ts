@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { getOptionalEnv, getRequiredEnv } from "@/lib/security/env";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { getOptionalEnv, getRequiredEnv, isProduction } from "@/lib/security/env";
 
 const TEST_VAR = "SIGNAL_TEST_ENV_VAR";
 
@@ -30,5 +30,23 @@ describe("getOptionalEnv", () => {
     process.env[TEST_VAR] = "example-value";
 
     expect(getOptionalEnv(TEST_VAR)).toBe("example-value");
+  });
+});
+
+describe("isProduction", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("returns true when NODE_ENV is production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect(isProduction()).toBe(true);
+  });
+
+  it("returns false for any other NODE_ENV", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    expect(isProduction()).toBe(false);
+    vi.stubEnv("NODE_ENV", "test");
+    expect(isProduction()).toBe(false);
   });
 });
