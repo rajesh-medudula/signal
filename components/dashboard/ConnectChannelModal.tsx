@@ -1,6 +1,6 @@
 "use client";
 
-import { Mail, MessageCircle, Camera, Send, MessageSquare, Globe } from "lucide-react";
+import { MessageCircle, Camera, Send, MessageSquare, Globe } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal, ModalContent, ModalTitle, ModalDescription, ModalTrigger } from "@/components/ui/Modal";
 import { StatusIndicator } from "@/components/ui/StatusIndicator";
@@ -8,7 +8,6 @@ import { Divider } from "@/components/ui/Divider";
 import type { ReactNode } from "react";
 
 const channels = [
-  { name: "Gmail", icon: Mail },
   { name: "WhatsApp Business", icon: MessageCircle },
   { name: "Instagram", icon: Camera },
   { name: "Telegram", icon: Send },
@@ -21,9 +20,12 @@ type ConnectChannelModalProps = {
 };
 
 /**
- * Honest placeholder: no channel actually connects yet. This exists so the
- * Modal pattern and the eventual "pick a channel" flow are already in
- * place for the channel-integration module to fill in.
+ * Honest placeholder for every channel except Gmail: none of these
+ * actually connect yet. Gmail has its own real connect/reconnect/
+ * disconnect flow (GmailConnectionCard on the Channels page as of
+ * Module 4) and is deliberately left out of this list — surfacing it
+ * here too would just be a second, non-functional path to the same
+ * thing.
  */
 export function ConnectChannelModal({ trigger }: ConnectChannelModalProps) {
   return (
@@ -32,7 +34,7 @@ export function ConnectChannelModal({ trigger }: ConnectChannelModalProps) {
       <ModalContent>
         <ModalTitle>Connect a channel</ModalTitle>
         <ModalDescription>
-          Channel connections aren&apos;t available yet. This is where
+          These channels aren&apos;t available yet. This is where
           you&apos;ll link the inbox your customers write to.
         </ModalDescription>
 

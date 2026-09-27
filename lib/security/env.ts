@@ -20,3 +20,9 @@ export function getRequiredEnv(name: string): string {
 export function getOptionalEnv(name: string): string | undefined {
   return process.env[name];
 }
+
+/** The one sanctioned way to check NODE_ENV, so other code doesn't
+ * read `process.env` directly for it. */
+export function isProduction(): boolean {
+  return process.env.NODE_ENV === "production";
+}
