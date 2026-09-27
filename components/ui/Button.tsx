@@ -58,3 +58,23 @@ export function ButtonLink({
     />
   );
 }
+
+type ButtonAnchorProps = ComponentProps<"a"> & {
+  variant?: Variant;
+  size?: Size;
+};
+
+/** A styled native link for destinations that must use browser navigation. */
+export function ButtonAnchor({
+  variant = "primary",
+  size = "md",
+  className,
+  ...props
+}: ButtonAnchorProps) {
+  return (
+    <a
+      className={cn(base, sizes[size], variants[variant], className)}
+      {...props}
+    />
+  );
+}

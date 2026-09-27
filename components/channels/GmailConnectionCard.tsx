@@ -1,6 +1,6 @@
 import { Mail } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { Button, ButtonLink } from "@/components/ui/Button";
+import { Button, ButtonAnchor } from "@/components/ui/Button";
 import { StatusIndicator } from "@/components/ui/StatusIndicator";
 import type { GmailConnectionView } from "@/lib/channels/gmail/queries";
 
@@ -90,13 +90,13 @@ export function GmailConnectionCard({
           <div className="flex shrink-0 items-center gap-2">
             {showsReconnectDisconnect ? (
               <>
-                <ButtonLink
+                <ButtonAnchor
                   href="/api/channels/gmail/authorize"
                   variant="secondary"
                   size="sm"
                 >
                   Reconnect
-                </ButtonLink>
+                </ButtonAnchor>
                 <form action="/api/channels/gmail/disconnect" method="POST">
                   <input
                     type="hidden"
@@ -109,9 +109,9 @@ export function GmailConnectionCard({
                 </form>
               </>
             ) : (
-              <ButtonLink href="/api/channels/gmail/authorize" size="sm">
+              <ButtonAnchor href="/api/channels/gmail/authorize" size="sm">
                 {connection ? "Reconnect Gmail" : "Connect Gmail"}
-              </ButtonLink>
+              </ButtonAnchor>
             )}
           </div>
         ) : null}

@@ -2,7 +2,7 @@ import { requireBusinessAccess } from "@/lib/business/authorization";
 import { listGmailConnections } from "@/lib/channels/gmail/queries";
 import { GmailConnectionCard } from "@/components/channels/GmailConnectionCard";
 import { ConnectChannelModal } from "@/components/dashboard/ConnectChannelModal";
-import { ButtonLink, Button } from "@/components/ui/Button";
+import { ButtonAnchor, Button } from "@/components/ui/Button";
 
 type ChannelsPageProps = {
   searchParams: Promise<{ gmail?: string; reason?: string }>;
@@ -42,13 +42,13 @@ export default async function ChannelsPage({ searchParams }: ChannelsPageProps) 
         )}
 
         {isAdmin && gmailConnections.length > 0 ? (
-          <ButtonLink
+          <ButtonAnchor
             href="/api/channels/gmail/authorize"
             variant="ghost"
             size="sm"
           >
             Connect another Gmail account
-          </ButtonLink>
+          </ButtonAnchor>
         ) : null}
       </div>
 
